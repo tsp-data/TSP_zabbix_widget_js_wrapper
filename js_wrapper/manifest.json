@@ -1,0 +1,24 @@
+{
+  "manifest_version": 2.0,
+  "id": "js_wrapper",
+  "type": "widget",
+  "name": "JS wrapper",
+  "namespace": "VueWrapper",
+  "version": "1.0",
+  "author": "TSP Data",
+  "description": "A widget to wrap javascript UMD components",
+  "actions": {
+    "widget.js_wrapper.view": { "class": "WidgetView" },
+    "widget.js_wrapper.edit": { "class": "WidgetEdit" }
+  },
+  "widget": {
+    "name": "JS wrapper",
+    "size": { "width": 12, "height": 5 },
+    "js_class": "WidgetVueWrapper"
+  },
+  "assets": {
+    "css": ["widget.css"],
+    "js": ["process-shim.js", "class.widget.js"]
+  }
+}
+

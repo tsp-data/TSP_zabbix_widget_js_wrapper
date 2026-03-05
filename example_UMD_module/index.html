@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zabbix Widget Demo Shell</title>
+    <style>
+      /*
+       * Demo host container for local development.
+       *
+       * In real Zabbix usage, the portal area is the outer container and controls
+       * size. Here we emulate that behavior with a fixed/resizable 800x600 area so the Vue app
+       * can be tested in a stable environment.
+       *
+       * resize: both allows manual drag-resize in browser to simulate widget resizing.
+       */
+      #widget-container {
+        width: 800px;
+        height: 600px;
+        resize: both;
+        overflow: auto;
+        border: 1px solid #cfcfcf;
+      }
+
+      /*
+       * Vue mount node must fill its parent completely.
+       * App.vue then fills this node with width/height: 100%.
+       */
+      #app {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Local demo hierarchy:
+      widget-container (simulated Zabbix host area)
+        -> app (Vue root)
+          -> App.vue chart
+    -->
+    <div id="widget-container">
+      <div id="app"></div>
+    </div>
+
+    <script>
+      /*
+       * ECharts reacts to window resize events.
+       *
+       * Because #widget-container is user-resizable, we observe its dimension changes
+       * and forward them as a synthetic window resize event, so the widget can call
+       * chart.resize() and recompute layout immediately.
+       */
+      const widgetContainer = document.getElementById('widget-container')
+      const ro = new ResizeObserver(() => {
+        window.dispatchEvent(new Event('resize'))
+      })
+      ro.observe(widgetContainer)
+    </script>
+
+    <!-- Vite dev entry for local preview -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

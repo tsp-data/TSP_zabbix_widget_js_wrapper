@@ -1,0 +1,10 @@
+/* Root element created by the wrapper JS */
+.vue-wrapper-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  /* basic reset to avoid inherited weirdness */
+  box-sizing: border-box;
+}
