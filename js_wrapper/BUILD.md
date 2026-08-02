@@ -90,6 +90,14 @@ When updating only UMD widget code:
 - rebuild UMD library,
 - replace files in `.../modules/js_wrapper/assets/umd/`.
 
+No extra cache busting step is needed, and nothing outside the module has to be configured
+for it: the wrapper appends the asset's modification time to the URL it requests, so
+replacing the file is enough for browsers to pick up the new build. See "Cache Busting" in
+`README.md`.
+
+The one way to break this is to **preserve mtimes while copying** - `cp -p`, or `rsync -a`
+from an older source tree. Use a plain copy.
+
 ## 9. Smoke Test Checklist
 
 - Module appears in Zabbix module list and is enabled.
@@ -97,3 +105,5 @@ When updating only UMD widget code:
 - Widget renders without runtime errors.
 - Browser devtools show successful load of `*.umd.js` and `*.css`.
 - Widget refresh cycle works (`update()` is called, or remount fallback works).
+- The `*.umd.js` / `*.css` requests carry a `?v=` token, and it changes after redeploying
+  a build.

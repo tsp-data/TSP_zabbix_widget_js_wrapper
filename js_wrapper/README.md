@@ -27,6 +27,47 @@ Notes:
 - CSS is attempted automatically; load failure is logged but does not block script mount.
 - Script/CSS loads are cached across widget instances in the same page session.
 
+### Cache Busting
+
+Both URLs carry a `?v=<mtime>` token, where `<mtime>` is the modification time of that
+file on the frontend. `WidgetView.php` reads it and passes it to the client as
+`asset_versions` on the widget view response.
+
+This is not cosmetic. Without it the URL is identical for every release of a component,
+so a browser that cached one build keeps serving it. It is also not something a user can
+work around: the wrapper injects the `<script>` element itself, *after* the page has
+loaded, and a hard reload only bypasses the cache for resources fetched as part of the
+navigation. A stale build therefore survives Ctrl+F5 and can be cleared only through
+devtools or by wiping the browser cache.
+
+The token changes exactly when the file changes, so deploying a new build is enough -
+there is no version to bump and nothing to remember.
+
+**No web server configuration is required.** This works from installing the module alone,
+which is deliberate: a fix that depends on an `apache`/`nginx` change is a fix that will be
+missing at some deployment. The correctness of the mechanism comes from the URL itself, not
+from response headers.
+
+Without cache headers a browser applies heuristic freshness, so the *same* build may cost
+an occasional conditional request (a `304`, a few hundred bytes) instead of coming straight
+from cache. That is the accepted trade for needing no configuration. A deployment that
+wants to avoid even that can add a long lifetime, which is safe precisely because the URL
+now identifies one exact build - but it is an optimisation, not a requirement:
+
+```apache
+<Directory /usr/share/zabbix/modules/js_wrapper/assets/umd>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</Directory>
+```
+
+Versioned URLs also survive intermediaries: a reverse proxy or CDN sees a different URL
+per build, so no header negotiation has to be trusted there either.
+
+Both halves degrade gracefully. A frontend running an older `js_wrapper` sends no
+`asset_versions` and the wrapper requests the bare URL as it always did; a newer PHP side
+paired with an older `class.widget.js` simply has its extra response key ignored. Neither
+mismatch should be combined with the optional `immutable` header above.
+
 ## Expected UMD API Contract
 
 Your UMD file must expose a global object on `window[component]` with `mount()`.

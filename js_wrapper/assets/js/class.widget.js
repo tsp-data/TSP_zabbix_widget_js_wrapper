@@ -2,8 +2,13 @@
 // Zabbix dashboard widget wrapper for Vue UMD components exposed as window[component].
 //
 // For component = "MyChart", wrapper loads:
-//   modules/js_wrapper/assets/umd/MyChart.umd.js
-//   modules/js_wrapper/assets/umd/MyChart.css
+//   modules/js_wrapper/assets/umd/MyChart.umd.js?v=<mtime>
+//   modules/js_wrapper/assets/umd/MyChart.css?v=<mtime>
+//
+// The ?v= token comes from the server (WidgetView.php) and is the asset's modification
+// time. Without it the URL never changes between releases, so a browser that cached one
+// build serves it indefinitely - and because the script is injected after the page has
+// loaded, a hard reload does not replace it either. See _assetQuery().
 //
 // Expected UMD API:
 //   window.MyChart = {
@@ -26,6 +31,8 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
     this._vueInstance = null;
     this._mountedComponent = null;
     this._mountedRoot = null;
+    // Cache busting tokens per asset kind, supplied by the view response.
+    this._assetVersions = {};
     // Incremented on each sync; prevents stale async work from applying.
     this._renderToken = 0;
     this._isDestroyed = false;
@@ -104,6 +111,18 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
     return 'modules/js_wrapper/assets';
   }
 
+  /**
+   * Cache busting suffix for one asset kind ("js" or "css").
+   *
+   * Returns an empty string when the server sent no token - a frontend running an older
+   * js_wrapper, or a component whose file is missing. The wrapper then behaves exactly
+   * as it did before, requesting the bare URL.
+   */
+  _assetQuery(kind) {
+    const version = this._assetVersions ? this._assetVersions[kind] : null;
+    return version ? `?v=${encodeURIComponent(version)}` : '';
+  }
+
   _destroyVue() {
     // Unified cleanup path for normal destroy and error states.
     try {
@@ -159,8 +178,8 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
 
   async _ensureApi(component, token) {
     const base = this._getAssetBase();
-    const jsUrl = `${base}/umd/${component}.umd.js`;
-    const cssUrl = `${base}/umd/${component}.css`;
+    const jsUrl = `${base}/umd/${component}.umd.js${this._assetQuery('js')}`;
+    const cssUrl = `${base}/umd/${component}.css${this._assetQuery('css')}`;
 
     this._loadCssOnce(cssUrl);
 
@@ -277,6 +296,13 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
     // Do not call super here: base implementation can replace widget DOM,
     // which would force remount on every refresh cycle.
     // This widget keeps its own mount/update cycle for UMD component stability.
+
+    // Picked up before _sync(), which is what builds the asset URLs. This is also the
+    // only path into _sync(), so the tokens are always in place before the first load.
+    if (response && typeof response.asset_versions === 'object' && response.asset_versions) {
+      this._assetVersions = response.asset_versions;
+    }
+
     this._sync('processUpdateResponse');
   }
 
