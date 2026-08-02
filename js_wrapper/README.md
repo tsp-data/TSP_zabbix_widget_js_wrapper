@@ -96,7 +96,7 @@ window.MyChart = {
   - `conf`: parsed object from `conf_json`
   - `context`:
     - `widgetid`: Zabbix widget id (or `null`)
-    - `rf_rate`: refresh rate if available, otherwise `null`
+    - `rf_rate`: **informational only** - see "Refresh is driven by Zabbix" below
   - `zbx`: reserved object for host API extensions (currently empty)
 
 Return value:
@@ -112,6 +112,42 @@ Return value:
   - if returned instance has `update()`, wrapper calls `update(payload)`
   - otherwise wrapper remounts by calling `destroy()` (if present) and `mount()` again
 - Widget destroy: wrapper calls `destroy()` (if present) and releases local references.
+
+### Refresh is driven by Zabbix
+
+**A module must not schedule its own refresh.** The dashboard owns the cycle: Zabbix's `CWidget`
+runs `setInterval(() => this._update(), rf_rate * 1000)`, each tick reaches the wrapper through
+`processUpdateResponse()`, and the wrapper then drives the module. Reacting to `update()` - or to
+being remounted - is the whole of what a module has to do.
+
+That covers modules which cannot react to an external impulse, too: one that does not implement
+`update()` is **remounted on every cycle** (see above), so it refreshes without doing anything.
+
+Zabbix also stops the cycle deliberately - while the dashboard is in edit mode, when the widget is
+inactive, and when the refresh interval is set to "No refresh". A module running its own timer would
+ignore all three, keep hitting the API when it should not, and refresh twice over when it should.
+
+### `context.rf_rate`
+
+Informational metadata, in the same category as `widgetid`. It is the **raw value of the widget's
+refresh interval field**, which means:
+
+| Widget configuration | `context.rf_rate` |
+| --- | --- |
+| An explicit interval (10, 30, 60, 120, 600, 900) | that number, in seconds |
+| "No refresh" | `0` |
+| **"Default"** (the usual case) | **`-1`** - the *effective* interval is the dashboard default, not -1 |
+| Field absent | `null` |
+
+So `-1` is not an error and not an interval: it means "whatever the dashboard's default is". The
+resolved value lives in `CWidget.getRfRate()`, which the wrapper does not currently forward.
+
+Treat the value as a hint - to size a cache, to phrase an "updates every N s" label - and always
+handle `-1`, `0` and `null`. Do **not** build timing on it.
+
+Historical note: `rf_rate` predates the wrapper hooking into the standard Zabbix update event, and
+was originally imagined as something a module could time itself by. It no longer serves that
+purpose, and no shipped module reads it.
 
 ## Configuration Rules and Error Handling
 

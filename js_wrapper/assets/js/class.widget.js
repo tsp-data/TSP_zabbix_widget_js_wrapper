@@ -100,6 +100,18 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
     }
   }
 
+  /**
+   * The widget's refresh interval field, passed to the module as informational context.
+   *
+   * It does NOT drive anything. Zabbix owns the refresh cycle and reaches the module
+   * through processUpdateResponse() -> _sync(); a module must not schedule its own
+   * refresh, and one that does not implement update() is remounted every cycle anyway.
+   *
+   * This is the raw field value, so it is `-1` whenever the interval is left at
+   * "Default" - which is the usual case. The resolved number of seconds lives in
+   * CWidget.getRfRate() and is deliberately not forwarded, because nothing consumes it.
+   * See "context.rf_rate" in README.md.
+   */
   _resolveRfRate(fields) {
     const v = fields?.rf_rate;
     if (v === undefined || v === null || v === '') return null;
