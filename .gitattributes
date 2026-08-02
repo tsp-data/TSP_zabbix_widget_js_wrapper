@@ -1,0 +1,14 @@
+# One line ending everywhere: LF in git, LF in the working tree.
+#
+# Sources are edited on Windows and deployed to a Linux Zabbix frontend, and the two
+# had drifted apart: js_wrapper/*.php, *.js and *.css were stored as CRLF while the
+# markdown and the built UMD assets next to them were LF, and two files under
+# example_UMD_module/ held both endings inside one file.
+#
+# Nothing was broken by it - the repository holds no shell script and no shebang, and
+# PHP, JS, CSS and JSON do not care. The cost was diffs: rewriting one line with an
+# editor that disagrees turns into a whole-file change, which happened here.
+#
+# text=auto leaves git to detect binaries; eol=lf pins the working tree as well, so
+# the mixture cannot creep back in.
+* text=auto eol=lf
