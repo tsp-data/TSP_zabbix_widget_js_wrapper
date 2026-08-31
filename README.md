@@ -31,6 +31,12 @@ Examples of possible ecosystem projects include:
   - Reference JavaScript UMD module intended to be used with the Zabbix wrapper.
   - Serves as a practical example of module structure and build workflow.
 
+- `debug_UMD_module/`
+  - Diagnostics UMD module (TypeScript): renders the payload the wrapper passes to a
+    module, counts update cycles, and offers a live test button for the `zbx.api`
+    host API.
+  - The first thing to deploy when a module of your own misbehaves.
+
 ## Documentation
 
 This root README is intentionally high-level.
@@ -39,3 +45,4 @@ Detailed documentation is provided in README files inside each directory:
 
 - `js_wrapper/README.md`
 - `example_UMD_module/README.md`
+- `debug_UMD_module/README.md`

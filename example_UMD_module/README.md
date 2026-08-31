@@ -49,7 +49,10 @@ Payload received from wrapper:
 
 - `payload.conf`: parsed JSON configuration (`conf_json` from widget settings)
 - `payload.context`: runtime metadata (for example `widgetid`, `rf_rate`)
-- `payload.zbx`: reserved host API object (currently empty)
+- `payload.zbx`: the host API - `capabilities`, and `api(method, params)` for
+  session-authenticated Zabbix API calls when the wrapper offers it (see "Host API"
+  in `../js_wrapper/README.md`; this example does not call it - `debug_UMD_module`
+  demonstrates it with a live test button)
 
 ## Build Outputs
 
