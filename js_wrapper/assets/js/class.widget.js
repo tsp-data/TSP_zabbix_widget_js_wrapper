@@ -14,6 +14,20 @@
 //   window.MyChart = {
 //     mount(el, { conf, context, zbx }) => { destroy?(), update?() }
 //   }
+//
+// payload.zbx is the host API the wrapper offers to the module:
+//   zbx.capabilities        - what this wrapper build provides, e.g. { api: 1 }.
+//                             Feature-detect on this (or on typeof zbx.api), never on
+//                             a version number.
+//   zbx.api(method, params[, {signal}])
+//                           - session-authenticated Zabbix API call, executed with the
+//                             permissions of the logged-in user through the module
+//                             action "widget.js_wrapper.api". Resolves with the JSON-RPC
+//                             result; rejects with an Error carrying code/data in the
+//                             same shape api_jsonrpc.php produces. See "Host API" in
+//                             README.md. Modules may instead keep calling
+//                             api_jsonrpc.php with a configured token - both access
+//                             modes are supported, they serve different trust models.
 
 window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
   static DEBUG = false;
@@ -33,6 +47,9 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
     this._mountedRoot = null;
     // Cache busting tokens per asset kind, supplied by the view response.
     this._assetVersions = {};
+    // CSRF token for the API gate, supplied by the view response. Empty when the PHP
+    // side predates the gate; zbx.capabilities.api is then simply not offered.
+    this._apiCsrfToken = '';
     // Incremented on each sync; prevents stale async work from applying.
     this._renderToken = 0;
     this._isDestroyed = false;
@@ -133,6 +150,83 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
   _assetQuery(kind) {
     const version = this._assetVersions ? this._assetVersions[kind] : null;
     return version ? `?v=${encodeURIComponent(version)}` : '';
+  }
+
+  /**
+   * One call through the API gate ("widget.js_wrapper.api").
+   *
+   * Runs with the permissions of the logged-in user - the gate authenticates the
+   * frontend session and the API layer applies the user's own rights, so there is no
+   * token anywhere in the widget configuration.
+   *
+   * Errors are normalized to an Error whose message is ready to display and which
+   * carries `code`/`data` (and `httpStatus` for transport failures) in the same shape
+   * a module gets from api_jsonrpc.php, so both access modes can share error handling.
+   *
+   * @param {string} method               e.g. "maintenance.get"
+   * @param {object|Array} params         JSON-RPC params
+   * @param {{signal?: AbortSignal}} opts Optional; lets the module keep timeout/abort
+   *                                      semantics it would have with its own fetch.
+   * @returns {Promise<any>}              The JSON-RPC result.
+   */
+  async _hostApiCall(method, params, opts) {
+    const res = await fetch('zabbix.php?action=widget.js_wrapper.api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      signal: opts?.signal,
+      // Module actions have their CSRF token checked against the action name; the
+      // token itself arrives with every widget update response (see WidgetView.php).
+      body: JSON.stringify({ method, params: params ?? {}, _csrf_token: this._apiCsrfToken })
+    });
+
+    if (!res.ok) {
+      const err = new Error(`Host API transport error: HTTP ${res.status}`);
+      err.httpStatus = res.status;
+      throw err;
+    }
+
+    const payload = await res.json();
+
+    if (payload && payload.error) {
+      // Two shapes can arrive: the gate's JSON-RPC style {code, message, data}, and
+      // the Zabbix layout error {title, messages} (e.g. a CSRF or access failure that
+      // terminates the request before the gate runs).
+      const e = payload.error;
+      const err = new Error(
+        e.code !== undefined
+          ? `Zabbix API error ${e.code}: ${e.message}${e.data ? ` ${e.data}` : ''}`
+          : `${e.title ?? 'Host API error'}${e.messages?.length ? `: ${e.messages.join(' ')}` : ''}`
+      );
+      err.code = e.code;
+      err.data = e.data;
+      throw err;
+    }
+
+    if (!payload || !('result' in payload)) {
+      throw new Error('Host API response missing "result"');
+    }
+
+    return payload.result;
+  }
+
+  /**
+   * The host API object handed to the module as payload.zbx.
+   *
+   * `capabilities` names what this wrapper offers, so a module feature-detects
+   * instead of guessing from wrapper versions. `api` is only offered once the PHP
+   * side has supplied the CSRF token - which it does with the same response that
+   * triggers the first _sync(), so a module never sees the capability flap.
+   */
+  _buildZbx() {
+    const zbx = { capabilities: {} };
+
+    if (this._apiCsrfToken) {
+      zbx.capabilities.api = 1;
+      zbx.api = (method, params, opts) => this._hostApiCall(method, params, opts);
+    }
+
+    return zbx;
   }
 
   _destroyVue() {
@@ -281,8 +375,7 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
       widgetid: this._widgetid ?? null,
       rf_rate: this._resolveRfRate(fields)
     };
-    // zbx is reserved for future host API surface shared with UMD plugins.
-    const payload = { component, conf, context, zbx: {} };
+    const payload = { component, conf, context, zbx: this._buildZbx() };
     let api;
     try {
       api = await this._ensureApi(component, token);
@@ -313,6 +406,13 @@ window.WidgetVueWrapper = class WidgetVueWrapper extends CWidget {
     // only path into _sync(), so the tokens are always in place before the first load.
     if (response && typeof response.asset_versions === 'object' && response.asset_versions) {
       this._assetVersions = response.asset_versions;
+    }
+
+    // Same guarantee for the API gate token: present before the first mount, so
+    // zbx.capabilities.api never appears mid-session. Absent from responses of a PHP
+    // side that predates the gate, in which case the capability is not offered.
+    if (response && typeof response.api_csrf_token === 'string') {
+      this._apiCsrfToken = response.api_csrf_token;
     }
 
     this._sync('processUpdateResponse');

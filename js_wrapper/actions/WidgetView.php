@@ -4,6 +4,7 @@ namespace Modules\VueWrapper\Actions;
 
 use CControllerDashboardWidgetView;
 use CControllerResponseData;
+use CCsrfTokenHelper;
 
 class WidgetView extends CControllerDashboardWidgetView {
 
@@ -23,7 +24,15 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'name' => $this->getInput('name', $this->widget->getName()),
 			'component' => $component,
 			'conf_json' => $this->fields_values['conf_json'] ?? '{}',
-			'asset_versions' => $this->getAssetVersions($component)
+			'asset_versions' => $this->getAssetVersions($component),
+			/*
+			 * CSRF token for the API gate (WidgetApi.php). Module actions have their
+			 * token checked against the full action name, and the token is derived from
+			 * the session, so it is the same for every widget and every response of one
+			 * user - delivering it per update response just reuses the one channel the
+			 * wrapper already has (see asset_versions).
+			 */
+			'api_csrf_token' => CCsrfTokenHelper::get('widget.js_wrapper.api')
 		]));
 	}
 

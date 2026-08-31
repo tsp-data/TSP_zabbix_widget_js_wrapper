@@ -13,6 +13,9 @@ It lets you keep the Zabbix integration in PHP/host JS (`js_wrapper`) and your f
 - Resolves and loads runtime assets based on `component`
 - Calls the UMD module lifecycle (`mount`, then `update` or remount on refresh)
 - Handles teardown (`destroy`) when widget is removed
+- Offers a host API to the module (`zbx.api`): Zabbix API calls executed with the
+  permissions of the logged-in user, with no token in the widget configuration -
+  see "Host API" below
 
 ## Runtime Asset Resolution
 
@@ -97,13 +100,102 @@ window.MyChart = {
   - `context`:
     - `widgetid`: Zabbix widget id (or `null`)
     - `rf_rate`: **informational only** - see "Refresh is driven by Zabbix" below
-  - `zbx`: reserved object for host API extensions (currently empty)
+  - `zbx`: the host API - see "Host API" below
+    - `capabilities`: what this wrapper build offers, e.g. `{ api: 1 }`
+    - `api(method, params[, {signal}])`: session-authenticated Zabbix API call
 
 Return value:
 
 - Any object (instance handle), optionally with:
   - `destroy()` called during unmount/error replacement
   - `update(payload)` called on refresh if present
+
+## Host API
+
+`payload.zbx` is what the wrapper offers to a module beyond the DOM element. Detect
+features through `zbx.capabilities` (or `typeof zbx.api === 'function'`), never through a
+wrapper version number.
+
+### Two ways to reach the Zabbix API
+
+A module that needs Zabbix data has two supported access modes. They are both legitimate,
+and they serve **different trust models** - which one a deployment uses is a
+configuration decision of the module, not of the wrapper:
+
+| | Token (`api_jsonrpc.php` + `apikey` in `conf_json`) | Session (`zbx.api`) |
+| --- | --- | --- |
+| Acts as | the token's user - one shared service identity | the logged-in user |
+| Who can do what | everyone who sees the dashboard can do whatever the token can | each user is limited to their own permissions |
+| Secret in widget config | yes - readable by every dashboard viewer | none |
+| Works in `npm run dev` (no Zabbix frontend) | yes, via a dev proxy | no - there is no wrapper, so modules must fall back |
+| Depends on | nothing but the public JSON-RPC API | the wrapper's gate action (part of this module) |
+
+The intended module pattern is **auto with a fallback**: use `zbx.api` when the payload
+offers it, fall back to the configured token otherwise (older wrapper, local
+development), and let the module's configuration force one mode when the deployment
+wants that (`"api": "auto" | "token" | "session"` or similar). Both modes fail with the
+same error shape, so the error handling can be shared.
+
+```js
+function makeTransport(conf, zbx) {
+  const forced = conf.api ?? 'auto';
+
+  if (forced !== 'token' && typeof zbx?.api === 'function') {
+    return (method, params, opts) => zbx.api(method, params, opts);
+  }
+
+  if (forced === 'session') {
+    throw new Error('This wrapper does not offer zbx.api and "api" is set to "session".');
+  }
+
+  return tokenTransport(conf.apiurl, conf.apikey); // the module's own fetch client
+}
+```
+
+### `zbx.api(method, params[, {signal}])`
+
+Performs one Zabbix API call through the wrapper's gate action
+(`widget.js_wrapper.api`), authenticated by the **frontend session** of the user viewing
+the dashboard:
+
+- `method`: `"service.method"`, e.g. `"maintenance.get"`,
+- `params`: the JSON-RPC params object (or array, for methods like
+  `maintenance.delete`),
+- `signal` (optional): an `AbortSignal`, so a module keeps the timeout/abort semantics
+  it would have with its own `fetch`.
+
+Resolves with the JSON-RPC `result`. Rejects with an `Error` whose `message` is
+display-ready and which carries `code` and `data` exactly as `api_jsonrpc.php` would
+return them (transport failures carry `httpStatus` instead).
+
+What the gate enforces, in order:
+
+1. **CSRF.** The gate is a state-changing endpoint, so it validates a CSRF token bound
+   to its action name. The wrapper handles this transparently - the token travels to the
+   client with every widget update response.
+2. **The allowlist** (`includes/api_allowlist.php`). A deployment-editable list of
+   methods the gate forwards at all. Reads are allowed broadly by default (`*.get`),
+   writes are listed per method. This is defense in depth - the security boundary is the
+   next line - and it fails closed when the file is missing.
+3. **The user's role API rules.** The role's "API access" toggle and allowed/denied
+   method lists apply exactly as they would to the user's own token (Zabbix skips this
+   check for frontend-internal calls, the gate re-adds it - see
+   `includes/SessionApiClient.php`).
+4. **Everything the Zabbix API always enforces** - authentication and per-object
+   permissions - because the call runs through the same `CLocalApiClient` machinery
+   that serves `api_jsonrpc.php`.
+
+Consequences worth spelling out:
+
+- A user who may only *read* maintenances will get a permission error from
+  `maintenance.create` - through the gate they can no longer do more than their own
+  account allows, which is the point of this mode.
+- A role with **API access disabled** is refused by the gate, the same as its own token
+  would be. Enable API access for the role (the frontend-only permissions are not
+  enough), or use token mode for such deployments.
+- `zbx.api` is only present when the PHP side supplies the gate token, and it is
+  supplied with the same response that triggers the first mount - the capability never
+  appears or disappears mid-session.
 
 ## Lifecycle Behavior
 
@@ -170,8 +262,11 @@ purpose, and no shipped module reads it.
 
 ## Related Files
 
-- `manifest.json`: widget registration and assets
+- `manifest.json`: widget registration, actions and assets
 - `includes/WidgetForm.php`: widget config fields
-- `actions/WidgetView.php`: data passed to view
+- `includes/SessionApiClient.php`: API client of the gate; re-adds the role API rules
+- `includes/api_allowlist.php`: methods the API gate forwards (deployment-editable)
+- `actions/WidgetView.php`: data passed to view (asset versions, gate CSRF token)
+- `actions/WidgetApi.php`: the session-authenticated API gate behind `zbx.api`
 - `views/widget.view.php`: root mount container
-- `assets/js/class.widget.js`: host runtime + lifecycle bridge
+- `assets/js/class.widget.js`: host runtime + lifecycle bridge + `zbx` host API

@@ -107,3 +107,18 @@ from an older source tree. Use a plain copy.
 - Widget refresh cycle works (`update()` is called, or remount fallback works).
 - The `*.umd.js` / `*.css` requests carry a `?v=` token, and it changes after redeploying
   a build.
+- The API gate answers. In devtools on a dashboard page holding the widget, take
+  `api_csrf_token` from any `widget.js_wrapper.view` response (Network tab), then run
+  in the console:
+
+  ```js
+  fetch('zabbix.php?action=widget.js_wrapper.api', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({method: 'apiinfo.version', params: {}, _csrf_token: '<token>'})
+  }).then(r => r.json()).then(console.log)
+  ```
+
+  Expected: `{"result":"7.0.x"}`. A method outside `includes/api_allowlist.php` must
+  return `{"error":{...}}` naming the allowlist, and a wrong `_csrf_token` must be
+  refused.

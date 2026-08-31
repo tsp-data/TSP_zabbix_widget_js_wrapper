@@ -4,12 +4,13 @@
   "type": "widget",
   "name": "JS wrapper",
   "namespace": "VueWrapper",
-  "version": "1.0",
+  "version": "1.1",
   "author": "TSP Data",
   "description": "A widget to wrap javascript UMD components",
   "actions": {
     "widget.js_wrapper.view": { "class": "WidgetView" },
-    "widget.js_wrapper.edit": { "class": "WidgetEdit" }
+    "widget.js_wrapper.edit": { "class": "WidgetEdit" },
+    "widget.js_wrapper.api": { "class": "WidgetApi", "layout": "layout.json" }
   },
   "widget": {
     "name": "JS wrapper",
