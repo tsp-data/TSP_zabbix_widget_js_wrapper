@@ -260,6 +260,30 @@ purpose, and no shipped module reads it.
 5. In widget config, set `component = YourComponentName`.
 6. Put your JSON config into `conf_json`.
 
+### The build must be self-contained
+
+The wrapper injects **no globals** for the module - in particular there is no `process`
+shim. Vue and other bundled libraries read `process.env.NODE_ENV` at runtime, so a UMD
+build has to replace it at build time, or it fails in Zabbix with
+`ReferenceError: process is not defined` (typically the moment the script loads). With
+Vite that is one top-level entry - top-level, because `define` nested under `build` is
+silently ignored:
+
+```js
+export default defineConfig({
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
+  // ...
+});
+```
+
+See `example_UMD_module/vite.lib.config.js`. Historical note: wrapper versions up to 1.0
+shipped a `process-shim.js` that papered over this by defining `window.process` globally
+on every dashboard page. It was removed - a global mutation that every module silently
+depends on is exactly what a module contract is supposed to avoid, and builds that
+inline the value also drop their development-only code paths.
+
 ## Related Files
 
 - `manifest.json`: widget registration, actions and assets

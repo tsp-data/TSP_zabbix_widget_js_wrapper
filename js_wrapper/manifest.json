@@ -19,7 +19,7 @@
   },
   "assets": {
     "css": ["widget.css"],
-    "js": ["process-shim.js", "class.widget.js"]
+    "js": ["class.widget.js"]
   }
 }
 
