@@ -29,7 +29,7 @@ Expected output:
 Set your frontend modules directory (example path shown below, adjust to your installation):
 
 ```sh
-ZABBIX_MODULES_DIR=/usr/share/zabbix/ui/modules
+ZABBIX_MODULES_DIR=/usr/share/zabbix/modules
 ```
 
 Create target and copy wrapper files:

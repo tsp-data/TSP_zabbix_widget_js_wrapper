@@ -46,3 +46,7 @@ Detailed documentation is provided in README files inside each directory:
 - `js_wrapper/README.md`
 - `example_UMD_module/README.md`
 - `debug_UMD_module/README.md`
+
+## License
+
+MIT - see `LICENSE`. Copyright (c) 2026 TSP Data a.s.
