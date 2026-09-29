@@ -50,3 +50,20 @@ Detailed documentation is provided in README files inside each directory:
 ## License
 
 MIT - see `LICENSE`. Copyright (c) 2026 TSP Data a.s.
+
+The `js_wrapper` module's own code contains no third-party libraries. The prebuilt example and
+debug modules shipped in `js_wrapper/assets/umd/` bundle third-party libraries under their own
+permissive licenses: [Vue](https://github.com/vuejs/core) (MIT) in both, and in `example.umd.js`
+also [Apache ECharts](https://github.com/apache/echarts) (Apache-2.0) with its dependencies
+[ZRender](https://github.com/ecomfe/zrender) (BSD-3-Clause) and
+[tslib](https://github.com/microsoft/tslib) (0BSD). Their copyright notices are in the packages'
+own `LICENSE` files (see `node_modules/` in `example_UMD_module/` and `debug_UMD_module/` after
+`npm install`). The `NOTICE` file of Apache ECharts reads:
+
+```text
+Apache ECharts
+Copyright 2017-2025 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+```
