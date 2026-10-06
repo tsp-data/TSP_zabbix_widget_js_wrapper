@@ -21,6 +21,30 @@ Examples of possible ecosystem projects include:
 - Highcharts: https://www.highcharts.com/
 - ApexCharts: https://apexcharts.com/
 
+## Installation
+
+No build is needed to use the wrapper: every
+[release](https://github.com/tsp-data/TSP_zabbix_widget_js_wrapper/releases) ships
+`js_wrapper-<version>.zip`, the complete Zabbix module directory, with SHA-256 checksums. The archive
+includes the prebuilt `example` and `debug` modules.
+
+1. Unpack the archive into the `modules` directory of the Zabbix frontend
+   (`/usr/share/zabbix/modules/` for the Zabbix 7.0 RPM/DEB packages), so that
+   `modules/js_wrapper/manifest.json` exists, and make the files readable by the web server user.
+2. In the Zabbix frontend open Administration -> General -> Modules, click "Scan directory" and
+   enable `JS wrapper`.
+3. Add a `JS wrapper` widget to a dashboard and set `component` to `debug` with `conf_json` `{}` to
+   confirm the installation; the widget shows the payload it receives and a test button for the
+   host API.
+4. Add the widget modules you want to use: copy their `<name>.umd.js` and `<name>.css` into
+   `modules/js_wrapper/assets/umd/`. Prebuilt files are attached to the releases of
+   [zbx_widget_MDtext_UMD_module](https://github.com/tsp-data/zbx_widget_MDtext_UMD_module/releases)
+   and
+   [zbx_widget_hosts_alarms_UMD_module](https://github.com/tsp-data/zbx_widget_hosts_alarms_UMD_module/releases).
+
+Deployment details, the update workflow and a smoke test checklist are in `js_wrapper/BUILD.md`;
+versions are listed in `CHANGELOG.md`.
+
 ## Repository Structure
 
 - `js_wrapper/`
